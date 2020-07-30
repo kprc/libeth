@@ -17,11 +17,11 @@ type Account struct {
 }
 
 type AccountJson struct {
-	acct *Account             `json:"acct"`
-	cj   *keystore.CryptoJSON `json:"cj"`
+	Acct *Account             `json:"acct"`
+	Cj   *keystore.CryptoJSON `json:"cj"`
 }
 
-func NewKey() (acct *Account, err error) {
+func NewAccount() (acct *Account, err error) {
 	key, err := crypto.GenerateKey()
 	if err != nil {
 		return nil, err
@@ -43,9 +43,9 @@ func (acct *Account) Unmarshal(data []byte, auth string) error {
 		return err
 	}
 
-	acct.SAddr = aj.acct.SAddr
+	acct.SAddr = aj.Acct.SAddr
 
-	if keyBytes, err := keystore.DecryptDataV3(*aj.cj, auth); err != nil {
+	if keyBytes, err := keystore.DecryptDataV3(*aj.Cj, auth); err != nil {
 		return err
 	} else {
 		acct.PrivKey = crypto.ToECDSAUnsafe(keyBytes)
@@ -62,8 +62,8 @@ func (acct *Account) Marshal(auth string) ([]byte, error) {
 	if cs, err := keystore.EncryptDataV3(keyBytes, []byte(auth), keystore.StandardScryptN, keystore.StandardScryptP); err != nil {
 		return nil, err
 	} else {
-		aj.acct = acct
-		aj.cj = &cs
+		aj.Acct = acct
+		aj.Cj = &cs
 	}
 
 	return json.Marshal(*aj)

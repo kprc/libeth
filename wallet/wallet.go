@@ -19,38 +19,64 @@ type Wallet struct {
 	client          client.Client
 	SavePath        string
 	RemoteEthServer string
-	balance         *big.Float
+	balance         float64
 }
 
 type WalletIntf interface {
-	BalanceOf() (*big.Float, error)
+	BalanceOf(force bool) (float64, error)
 	SendTo(to common.Address, balance float64) (*common.Hash, error)
 	Address() common.Address
 	AccountString() string
-	CheckReceipt(sendMeAddr common.Address, txHash common.Hash) (*big.Float, error)
+	CheckReceipt(sendMeAddr common.Address, txHash common.Hash) (float64, error)
 	Save(auth string) error
 	Load(auth string) error
 }
 
-func NewWallet(walletSavePath string, remoteEthServer string) WalletIntf {
-	return &Wallet{SavePath: walletSavePath, RemoteEthServer: remoteEthServer}
+func CreateWallet(walletSavePath string, remoteEthServer string) WalletIntf {
+	acct, err := account.NewAccount()
+	if err != nil {
+		return nil
+	}
+
+	var ec *ethclient.Client
+	ec, err = ethclient.Dial(remoteEthServer)
+	if err != nil {
+		return nil
+	}
+
+	w := &Wallet{account: *acct, SavePath: walletSavePath, RemoteEthServer: remoteEthServer}
+	w.client.C = ec
+	w.client.ServerHttpAddr = remoteEthServer
+
+	return w
 }
 
-func (w *Wallet) BalanceOf() (*big.Float, error) {
+func NewWallet(walletSavePath string, remoteEthServer string) WalletIntf {
+	w := &Wallet{SavePath: walletSavePath, RemoteEthServer: remoteEthServer}
+	return w
+}
+
+func (w *Wallet) BalanceOf(force bool) (float64, error) {
+	if !force {
+		return w.balance, nil
+	}
+
 	if balance, err := w.client.C.BalanceAt(context.Background(), w.account.EAddr, nil); err != nil {
-		return nil, err
+		return 0, err
 	} else {
 		w.balance = BalanceHuman(balance)
 	}
+
 	return w.balance, nil
 }
 
-func BalanceHuman(balance *big.Int) *big.Float {
+func BalanceHuman(balance *big.Int) float64 {
 	fbalance := new(big.Float)
 	fbalance.SetString(balance.String())
 	v := new(big.Float).Quo(fbalance, big.NewFloat(math.Pow10(18)))
 
-	return v
+	vv, _ := v.Float64()
+	return vv
 }
 
 func BalanceEth(balance float64) *big.Int {
@@ -106,27 +132,27 @@ func (w *Wallet) AccountString() string {
 	return w.account.SAddr
 }
 
-func (w *Wallet) CheckReceipt(sendMeAddr common.Address, txHash common.Hash) (*big.Float, error) {
+func (w *Wallet) CheckReceipt(sendMeAddr common.Address, txHash common.Hash) (float64, error) {
 	if tx, isPending, err := w.client.C.TransactionByHash(context.Background(), txHash); err != nil {
-		return nil, err
+		return 0, err
 	} else {
 		if isPending {
-			return nil, errors.New("is pending, please wait")
+			return 0, errors.New("is pending, please wait")
 		}
 
 		if tx.To().Hex() != w.account.SAddr {
-			return nil, errors.New("not send for me")
+			return 0, errors.New("not send for me")
 		}
 		var chainId *big.Int
 		if chainId, err = w.client.C.NetworkID(context.Background()); err != nil {
-			return nil, err
+			return 0, err
 		}
 		var msg types.Message
 		if msg, err = tx.AsMessage(types.NewEIP155Signer(chainId)); err != nil {
-			return nil, err
+			return 0, err
 		}
 		if msg.From() != sendMeAddr {
-			return nil, errors.New("not the send")
+			return 0, errors.New("not the send")
 		}
 
 		return BalanceHuman(tx.Value()), nil
@@ -157,6 +183,7 @@ func (w *Wallet) Load(auth string) error {
 		if err = w.account.Unmarshal(data, auth); err != nil {
 			return err
 		}
+
 		if w.client.C, err = ethclient.Dial(w.RemoteEthServer); err != nil {
 			return err
 		}
