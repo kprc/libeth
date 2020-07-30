@@ -120,7 +120,7 @@ func (w *Wallet) SendTo(to common.Address, balance float64) (*common.Hash, error
 		return nil, err
 	}
 
-	hash := tx.Hash()
+	hash := signdTx.Hash()
 	return &hash, nil
 }
 
