@@ -33,7 +33,7 @@ func test2() {
 
 	if w == nil {
 		if tools.FileExists(savepath) {
-			w = wallet.RecoverWallet(savepath, server)
+			w = wallet.NewWallet(savepath, server)
 			w.Load(string(passwd))
 			if err != nil {
 				panic("load wallet failed")
@@ -76,7 +76,7 @@ func test1() {
 
 	if w == nil {
 		if tools.FileExists(savepath) {
-			w = wallet.RecoverWallet(savepath, server)
+			w = wallet.NewWallet(savepath, server)
 			w.Load(string(passwd))
 			if err != nil {
 				panic("load wallet failed")

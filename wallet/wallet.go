@@ -51,7 +51,7 @@ func CreateWallet(walletSavePath string, remoteEthServer string) WalletIntf {
 	return w
 }
 
-func RecoverWallet(walletSavePath string, remoteEthServer string) WalletIntf {
+func NewWallet(walletSavePath string, remoteEthServer string) WalletIntf {
 	w := &Wallet{SavePath: walletSavePath, RemoteEthServer: remoteEthServer}
 	return w
 }
