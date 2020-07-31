@@ -75,6 +75,20 @@ func NewWallet(walletSavePath string, remoteEthServer string) WalletIntf {
 	return w
 }
 
+func RecoverWallet(walletSavePath, remoteEthServer, auth string) (WalletIntf, error) {
+	if !tools.FileExists(walletSavePath) {
+		return nil, errors.New("wallet saved file not found : " + walletSavePath)
+	}
+
+	w := NewWallet(walletSavePath, remoteEthServer)
+
+	if err := w.Load(auth); err != nil {
+		return nil, err
+	}
+
+	return w, nil
+}
+
 func (w *Wallet) BalanceOf(force bool) (float64, error) {
 	if !force {
 		return w.balance, nil

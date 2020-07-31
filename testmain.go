@@ -58,6 +58,7 @@ func test2() {
 	//fmt.Println("tx hash",tx.Hex())
 
 	fmt.Println("addr is :", w.AccountString())
+	fmt.Println("beatle addr:", w.BtlAddress().String())
 	fmt.Println("balance is :", bn)
 }
 
@@ -93,6 +94,7 @@ func test1() {
 	bn, _ := w.BalanceOf(true)
 
 	fmt.Println("addr is :", w.AccountString())
+	fmt.Println("beatle addr:", w.BtlAddress().String())
 	fmt.Println("balance is :", bn)
 
 	fromAddr := common.HexToAddress("0x6148AdCeA554793f0022717F5C0AC92571b30E98")
