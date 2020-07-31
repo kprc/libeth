@@ -2,12 +2,16 @@ package wallet
 
 import (
 	"context"
+	"crypto/ed25519"
+	"encoding/json"
 	"errors"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/kprc/libeth/account"
 	"github.com/kprc/libeth/client"
+	"github.com/kprc/libeth/util"
+	"golang.org/x/crypto/curve25519"
 	"math"
 	"math/big"
 
@@ -15,7 +19,8 @@ import (
 )
 
 type Wallet struct {
-	account         account.Account
+	account         account.EthAccount
+	btlAccount      account.BTLAccount
 	client          client.Client
 	SavePath        string
 	RemoteEthServer string
@@ -26,14 +31,22 @@ type WalletIntf interface {
 	BalanceOf(force bool) (float64, error)
 	SendTo(to common.Address, balance float64) (*common.Hash, error)
 	Address() common.Address
-	AccountString() string
+	BtlAddress() account.BeatleAddress
 	CheckReceipt(sendMeAddr common.Address, txHash common.Hash) (float64, error)
 	Save(auth string) error
 	Load(auth string) error
+	BtlSign(data []byte) []byte
+	BtlVerifySig(data, sig []byte) bool
+	BtlPeerEncrypt(peerPub ed25519.PublicKey, plainBytes []byte) (cipherBytes []byte, err error)
+	BtlPeerEncrypt2(peerId account.BeatleAddress, cipherBytes []byte) (plainBytes []byte, err error)
+	BtlPeerDecrypt(peerPub ed25519.PublicKey, plainBytes []byte) (cipherBytes []byte, err error)
+	BtlPeerDecrypt2(peerId account.BeatleAddress, cipherBytes []byte) (plainBytes []byte, err error)
+	AesKey(peerPub ed25519.PublicKey) (key []byte, err error)
+	AesKey2(peerId account.BeatleAddress) (key []byte, err error)
 }
 
 func CreateWallet(walletSavePath string, remoteEthServer string) WalletIntf {
-	acct, err := account.NewAccount()
+	acct, err := account.NewEthAccount()
 	if err != nil {
 		return nil
 	}
@@ -44,7 +57,12 @@ func CreateWallet(walletSavePath string, remoteEthServer string) WalletIntf {
 		return nil
 	}
 
-	w := &Wallet{account: *acct, SavePath: walletSavePath, RemoteEthServer: remoteEthServer}
+	btlacct, err := account.NewAccount()
+	if err != nil {
+		return nil
+	}
+
+	w := &Wallet{account: *acct, btlAccount: *btlacct, SavePath: walletSavePath, RemoteEthServer: remoteEthServer}
 	w.client.C = ec
 	w.client.ServerHttpAddr = remoteEthServer
 
@@ -128,6 +146,10 @@ func (w *Wallet) Address() common.Address {
 	return w.account.EAddr
 }
 
+func (w *Wallet) BtlAddress() account.BeatleAddress {
+	return w.btlAccount.ID
+}
+
 func (w *Wallet) AccountString() string {
 	return w.account.SAddr
 }
@@ -159,12 +181,34 @@ func (w *Wallet) CheckReceipt(sendMeAddr common.Address, txHash common.Hash) (fl
 	}
 }
 
+type WalletSaveJson struct {
+	EthAcct string `json:"eth_acct"`
+	BtlAcct string `json:"btl_acct"`
+}
+
 func (w *Wallet) Save(auth string) error {
-	if w.account.PrivKey == nil {
+	if w.account.PrivKey == nil || w.btlAccount.PrivKey == nil {
 		return errors.New("account error")
 	}
 
-	if data, err := w.account.Marshal(auth); err != nil {
+	wsj := &WalletSaveJson{}
+	var (
+		ethAcct []byte
+		btlAcct []byte
+		data    []byte
+		err     error
+	)
+
+	if ethAcct, err = w.account.Marshal(auth); err != nil {
+		return err
+	}
+	if btlAcct, err = w.btlAccount.Marshal(auth); err != nil {
+		return err
+	}
+
+	wsj.EthAcct = string(ethAcct)
+	wsj.BtlAcct = string(btlAcct)
+	if data, err = json.Marshal(*wsj); err != nil {
 		return err
 	} else {
 		if err = tools.Save2File(data, w.SavePath); err != nil {
@@ -177,17 +221,103 @@ func (w *Wallet) Save(auth string) error {
 
 func (w *Wallet) Load(auth string) error {
 
-	if data, err := tools.OpenAndReadAll(w.SavePath); err != nil {
-		return err
-	} else {
-		if err = w.account.Unmarshal(data, auth); err != nil {
-			return err
-		}
+	var (
+		data []byte
+		err  error
+	)
 
-		if w.client.C, err = ethclient.Dial(w.RemoteEthServer); err != nil {
-			return err
-		}
-		w.client.ServerHttpAddr = w.RemoteEthServer
+	if data, err = tools.OpenAndReadAll(w.SavePath); err != nil {
+		return err
 	}
+
+	wsj := WalletSaveJson{}
+
+	if err = json.Unmarshal(data, wsj); err != nil {
+		return err
+	}
+	if err = w.account.Unmarshal([]byte(wsj.EthAcct), auth); err != nil {
+		return err
+	}
+
+	if w.client.C, err = ethclient.Dial(w.RemoteEthServer); err != nil {
+		return err
+	}
+	w.client.ServerHttpAddr = w.RemoteEthServer
+
+	if err = w.btlAccount.Unmarshal([]byte(wsj.BtlAcct), auth); err != nil {
+		return err
+	}
+
 	return nil
+}
+
+func (w *Wallet) BtlSign(data []byte) []byte {
+	return ed25519.Sign(w.btlAccount.PrivKey, data)
+}
+func (w *Wallet) BtlVerifySig(data, sig []byte) bool {
+	return ed25519.Verify(w.btlAccount.PubKey, data, sig)
+}
+
+func (w *Wallet) BtlPeerEncrypt(peerPub ed25519.PublicKey, plainBytes []byte) (cipherBytes []byte, err error) {
+	var k []byte
+	if k, err = w.AesKey(peerPub); err != nil {
+		return nil, err
+	}
+
+	if cipherBytes, err = util.Encrypt(k, plainBytes); err != nil {
+		return nil, err
+	}
+
+	return
+}
+func (w *Wallet) BtlPeerEncrypt2(peerId account.BeatleAddress, plainBytes []byte) (cipherBytes []byte, err error) {
+	if !peerId.IsValid() {
+		return nil, errors.New("beatles address error")
+	}
+	pk := peerId.DerivePubKey()
+
+	return w.BtlPeerEncrypt(pk, plainBytes)
+
+}
+func (w *Wallet) BtlPeerDecrypt(peerPub ed25519.PublicKey, cipherBytes []byte) (plainBytes []byte, err error) {
+	var k []byte
+	if k, err = w.AesKey(peerPub); err != nil {
+		return nil, err
+	}
+
+	if plainBytes, err = util.Decrypt(k, cipherBytes); err != nil {
+		return nil, err
+	}
+
+	return
+}
+func (w *Wallet) BtlPeerDecrypt2(peerId account.BeatleAddress, cipherBytes []byte) (plainBytes []byte, err error) {
+	if !peerId.IsValid() {
+		return nil, errors.New("beatles address error")
+	}
+	pk := peerId.DerivePubKey()
+
+	return w.BtlPeerDecrypt(pk, cipherBytes)
+}
+
+func (w *Wallet) AesKey(peerPub ed25519.PublicKey) (key []byte, err error) {
+	var priKey [32]byte
+	var privateKeyBytes [64]byte
+	copy(privateKeyBytes[:], w.btlAccount.PrivKey)
+	util.PrivateKeyToCurve25519(&priKey, &privateKeyBytes)
+
+	var curvePub, pubKey [32]byte
+	copy(pubKey[:], peerPub)
+	if ok := util.PublicKeyToCurve25519(&curvePub, &pubKey); !ok {
+		return nil, errors.New("convert public key error")
+	}
+	return curve25519.X25519(priKey[:], curvePub[:])
+}
+func (w *Wallet) AesKey2(peerId account.BeatleAddress) (key []byte, err error) {
+	if !peerId.IsValid() {
+		return nil, errors.New("beatles address error")
+	}
+	pk := peerId.DerivePubKey()
+
+	return w.AesKey(pk)
 }
