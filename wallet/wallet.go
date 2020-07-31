@@ -31,6 +31,7 @@ type WalletIntf interface {
 	BalanceOf(force bool) (float64, error)
 	SendTo(to common.Address, balance float64) (*common.Hash, error)
 	Address() common.Address
+	AccountString() string
 	BtlAddress() account.BeatleAddress
 	CheckReceipt(sendMeAddr common.Address, txHash common.Hash) (float64, error)
 	Save(auth string) error
@@ -230,7 +231,7 @@ func (w *Wallet) Load(auth string) error {
 		return err
 	}
 
-	wsj := WalletSaveJson{}
+	wsj := &WalletSaveJson{}
 
 	if err = json.Unmarshal(data, wsj); err != nil {
 		return err

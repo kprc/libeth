@@ -77,7 +77,7 @@ func test1() {
 	if w == nil {
 		if tools.FileExists(savepath) {
 			w = wallet.NewWallet(savepath, server)
-			w.Load(string(passwd))
+			err = w.Load(string(passwd))
 			if err != nil {
 				panic("load wallet failed")
 			}
