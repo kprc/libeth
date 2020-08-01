@@ -248,7 +248,7 @@ func (w *Wallet) Load(auth string) error {
 		return err
 	}
 
-	return w.ImportWallet(string(data))
+	return w.RecoverWallet(string(data),auth)
 }
 
 func (w *Wallet) BtlSign(data []byte) []byte {
