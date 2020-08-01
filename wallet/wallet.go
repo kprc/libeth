@@ -39,14 +39,14 @@ type WalletIntf interface {
 	BtlSign(data []byte) []byte
 	BtlVerifySig(data, sig []byte) bool
 	BtlPeerEncrypt(peerPub ed25519.PublicKey, plainBytes []byte) (cipherBytes []byte, err error)
-	BtlPeerEncrypt2(peerId account.BeatleAddress, cipherBytes []byte) (plainBytes []byte, err error)
-	BtlPeerDecrypt(peerPub ed25519.PublicKey, plainBytes []byte) (cipherBytes []byte, err error)
+	BtlPeerEncrypt2(peerId account.BeatleAddress, plainBytes []byte) (cipherBytes []byte, err error)
+	BtlPeerDecrypt(peerPub ed25519.PublicKey, cipherBytes []byte) (plainBytes []byte, err error)
 	BtlPeerDecrypt2(peerId account.BeatleAddress, cipherBytes []byte) (plainBytes []byte, err error)
 	AesKey(peerPub ed25519.PublicKey) (key []byte, err error)
 	AesKey2(peerId account.BeatleAddress) (key []byte, err error)
-	ImportEthAccount(hexString,auth string) error
-	ExportWallet() (string,error)
-	ImportWallet(walletString ,auth string) error
+	RecoverEthAccount(hexString, auth string) error
+	ExportWallet() (string, error)
+	RecoverWallet(walletString, auth string) error
 }
 
 func CreateWallet(walletSavePath string, remoteEthServer string) WalletIntf {
@@ -322,19 +322,19 @@ func (w *Wallet) AesKey2(peerId account.BeatleAddress) (key []byte, err error) {
 	return w.AesKey(pk)
 }
 
-func (w *Wallet)ImportEthAccount(hexString ,auth string) error  {
-	if err:= w.account.ImportFromMetaMask(hexString);err!=nil{
+func (w *Wallet) RecoverEthAccount(hexString, auth string) error {
+	if err := w.account.ImportFromMetaMask(hexString); err != nil {
 		return err
 	}
 
-	if err:=w.Save(auth);err!=nil{
+	if err := w.Save(auth); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func (w *Wallet)ImportWallet(walletString ,auth string) error  {
+func (w *Wallet) RecoverWallet(walletString, auth string) error {
 	var err error
 	wsj := &WalletSaveJson{}
 	if err = json.Unmarshal([]byte(walletString), wsj); err != nil {
@@ -356,11 +356,10 @@ func (w *Wallet)ImportWallet(walletString ,auth string) error  {
 	return nil
 }
 
-
-func (w *Wallet)ExportWallet() (string,error)  {
+func (w *Wallet) ExportWallet() (string, error) {
 	if data, err := tools.OpenAndReadAll(w.SavePath); err != nil {
-		return "",err
-	}else{
-		return string(data),nil
+		return "", err
+	} else {
+		return string(data), nil
 	}
 }
