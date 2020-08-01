@@ -56,6 +56,20 @@ func (acct *EthAccount) Unmarshal(data []byte, auth string) error {
 	return nil
 }
 
+func (acct *EthAccount)ImportFromMetaMask(hexString string) (err error)  {
+	var priKey *ecdsa.PrivateKey
+	if priKey,err = crypto.HexToECDSA(hexString);err!=nil{
+		return err
+	}
+
+	acct.PrivKey = priKey
+	acct.PubKey = (acct.PrivKey.Public()).(*ecdsa.PublicKey)
+	acct.EAddr = crypto.PubkeyToAddress(*acct.PubKey)
+	acct.SAddr = acct.EAddr.String()
+
+	return nil
+}
+
 func (acct *EthAccount) Marshal(auth string) ([]byte, error) {
 	keyBytes := math.PaddedBigBytes(acct.PrivKey.D, 32)
 	aj := &AccountJson{}

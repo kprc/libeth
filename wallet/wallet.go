@@ -44,6 +44,9 @@ type WalletIntf interface {
 	BtlPeerDecrypt2(peerId account.BeatleAddress, cipherBytes []byte) (plainBytes []byte, err error)
 	AesKey(peerPub ed25519.PublicKey) (key []byte, err error)
 	AesKey2(peerId account.BeatleAddress) (key []byte, err error)
+	ImportEthAccount(hexString,auth string) error
+	ExportWallet() (string,error)
+	ImportWallet(walletString ,auth string) error
 }
 
 func CreateWallet(walletSavePath string, remoteEthServer string) WalletIntf {
@@ -189,7 +192,7 @@ func (w *Wallet) CheckReceipt(sendMeAddr common.Address, txHash common.Hash) (fl
 			return 0, err
 		}
 		if msg.From() != sendMeAddr {
-			return 0, errors.New("not the send")
+			return 0, errors.New("not the sender")
 		}
 
 		return BalanceHuman(tx.Value()), nil
@@ -245,25 +248,7 @@ func (w *Wallet) Load(auth string) error {
 		return err
 	}
 
-	wsj := &WalletSaveJson{}
-
-	if err = json.Unmarshal(data, wsj); err != nil {
-		return err
-	}
-	if err = w.account.Unmarshal([]byte(wsj.EthAcct), auth); err != nil {
-		return err
-	}
-
-	if w.client.C, err = ethclient.Dial(w.RemoteEthServer); err != nil {
-		return err
-	}
-	w.client.ServerHttpAddr = w.RemoteEthServer
-
-	if err = w.btlAccount.Unmarshal([]byte(wsj.BtlAcct), auth); err != nil {
-		return err
-	}
-
-	return nil
+	return w.ImportWallet(string(data))
 }
 
 func (w *Wallet) BtlSign(data []byte) []byte {
@@ -335,4 +320,47 @@ func (w *Wallet) AesKey2(peerId account.BeatleAddress) (key []byte, err error) {
 	pk := peerId.DerivePubKey()
 
 	return w.AesKey(pk)
+}
+
+func (w *Wallet)ImportEthAccount(hexString ,auth string) error  {
+	if err:= w.account.ImportFromMetaMask(hexString);err!=nil{
+		return err
+	}
+
+	if err:=w.Save(auth);err!=nil{
+		return err
+	}
+
+	return nil
+}
+
+func (w *Wallet)ImportWallet(walletString ,auth string) error  {
+	var err error
+	wsj := &WalletSaveJson{}
+	if err = json.Unmarshal([]byte(walletString), wsj); err != nil {
+		return err
+	}
+	if err = w.account.Unmarshal([]byte(wsj.EthAcct), auth); err != nil {
+		return err
+	}
+
+	if w.client.C, err = ethclient.Dial(w.RemoteEthServer); err != nil {
+		return err
+	}
+	w.client.ServerHttpAddr = w.RemoteEthServer
+
+	if err = w.btlAccount.Unmarshal([]byte(wsj.BtlAcct), auth); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+
+func (w *Wallet)ExportWallet() (string,error)  {
+	if data, err := tools.OpenAndReadAll(w.SavePath); err != nil {
+		return "",err
+	}else{
+		return string(data),nil
+	}
 }

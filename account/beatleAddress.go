@@ -38,6 +38,8 @@ func (ba BeatleAddress) Address() (addr Address, prefix string, ver int, err err
 
 	if vlen == Version1Len {
 		ver = int(data[1])
+	}else{
+		return emptyAddr,"",0,errors.New("version length is error")
 	}
 
 	ver = int(data[1])
@@ -65,7 +67,7 @@ func PubKey2ID(pk ed25519.PublicKey) BeatleAddress {
 
 	a.SetPubKey(pk)
 
-	return a.ID()
+	return (*a).ID()
 }
 
 func (a Address) String() string {
