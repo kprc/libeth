@@ -248,7 +248,7 @@ func (w *Wallet) Load(auth string) error {
 		return err
 	}
 
-	return w.RecoverWallet(string(data),auth)
+	return w.RecoverWallet(string(data), auth)
 }
 
 func (w *Wallet) BtlSign(data []byte) []byte {
@@ -335,11 +335,17 @@ func (w *Wallet) RecoverEthAccount(hexString, auth string) error {
 }
 
 func (w *Wallet) RecoverWallet(walletString, auth string) error {
+
+	if w.RemoteEthServer == "" || w.SavePath == "" {
+		return errors.New("please set dialer url and wallet save path")
+	}
+
 	var err error
 	wsj := &WalletSaveJson{}
 	if err = json.Unmarshal([]byte(walletString), wsj); err != nil {
 		return err
 	}
+
 	if err = w.account.Unmarshal([]byte(wsj.EthAcct), auth); err != nil {
 		return err
 	}
