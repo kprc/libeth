@@ -15,7 +15,22 @@ var w wallet.WalletIntf
 func main() {
 	//test2()
 
-	test1()
+	//test1()
+
+	//var a,b float64
+	//
+	//a = 1.1
+	//b = 1.0
+	//
+	//fmt.Println(int64(a/b))
+	//
+	//a = 1.51
+	//b = 1.0
+	//
+	//fmt.Println(int64(a/b))
+
+	//fmt.Println(common.BytesToHash(base58.Decode("DGt9G5Qw9Eyr4cVtSmsncpwnVtgin4rj8VsBPfCXFVXh")).Hex())
+
 }
 
 func test2() {

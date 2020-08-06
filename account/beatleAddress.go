@@ -105,7 +105,7 @@ func IsValidID(id string) bool {
 		return false
 	}
 
-	if id[:PrefixLen] != "tg" {
+	if id[:PrefixLen] != PrefixStr {
 		return false
 	}
 

@@ -47,6 +47,7 @@ type WalletIntf interface {
 	RecoverEthAccount(hexString, auth string) error
 	ExportWallet() (string, error)
 	RecoverWallet(walletString, auth string) error
+	String(auth string) (string, error)
 }
 
 func CreateWallet(walletSavePath string, remoteEthServer string) WalletIntf {
@@ -205,8 +206,21 @@ type WalletSaveJson struct {
 }
 
 func (w *Wallet) Save(auth string) error {
+
+	if data, err := w.String(auth); err != nil {
+		return err
+	} else {
+		if err = tools.Save2File([]byte(data), w.SavePath); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (w *Wallet) String(auth string) (string, error) {
 	if w.account.PrivKey == nil || w.btlAccount.PrivKey == nil {
-		return errors.New("account error")
+		return "", errors.New("account error")
 	}
 
 	wsj := &WalletSaveJson{}
@@ -218,23 +232,19 @@ func (w *Wallet) Save(auth string) error {
 	)
 
 	if ethAcct, err = w.account.Marshal(auth); err != nil {
-		return err
+		return "", err
 	}
 	if btlAcct, err = w.btlAccount.Marshal(auth); err != nil {
-		return err
+		return "", err
 	}
 
 	wsj.EthAcct = string(ethAcct)
 	wsj.BtlAcct = string(btlAcct)
 	if data, err = json.Marshal(*wsj); err != nil {
-		return err
+		return "", err
 	} else {
-		if err = tools.Save2File(data, w.SavePath); err != nil {
-			return err
-		}
+		return string(data), nil
 	}
-
-	return nil
 }
 
 func (w *Wallet) Load(auth string) error {
