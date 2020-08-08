@@ -57,9 +57,11 @@ func CreateWallet(walletSavePath string, remoteEthServer string) WalletIntf {
 	}
 
 	var ec *ethclient.Client
-	ec, err = ethclient.Dial(remoteEthServer)
-	if err != nil {
-		return nil
+	if remoteEthServer != "" {
+		ec, err = ethclient.Dial(remoteEthServer)
+		if err != nil {
+			return nil
+		}
 	}
 
 	btlacct, err := account.NewAccount()
@@ -97,6 +99,9 @@ func (w *Wallet) BalanceOf(force bool) (float64, error) {
 	if !force {
 		return w.balance, nil
 	}
+	if w.client.C == nil {
+		return 0, errors.New("no eth client")
+	}
 
 	if balance, err := w.client.C.BalanceAt(context.Background(), w.account.EAddr, nil); err != nil {
 		return 0, err
@@ -128,6 +133,10 @@ func BalanceEth(balance float64) *big.Int {
 }
 
 func (w *Wallet) SendTo(to common.Address, balance float64) (*common.Hash, error) {
+	if w.client.C == nil {
+		return nil, errors.New("no eth client")
+	}
+
 	nonce, err := w.client.C.PendingNonceAt(context.Background(), w.account.EAddr)
 	if err != nil {
 		return nil, err
@@ -174,6 +183,11 @@ func (w *Wallet) AccountString() string {
 }
 
 func (w *Wallet) CheckReceipt(sendMeAddr common.Address, txHash common.Hash) (float64, error) {
+
+	if w.client.C == nil {
+		return 0, errors.New("no eth client")
+	}
+
 	if tx, isPending, err := w.client.C.TransactionByHash(context.Background(), txHash); err != nil {
 		return 0, err
 	} else {
@@ -346,8 +360,8 @@ func (w *Wallet) RecoverEthAccount(hexString, auth string) error {
 
 func (w *Wallet) RecoverWallet(walletString, auth string) error {
 
-	if w.RemoteEthServer == "" || w.SavePath == "" {
-		return errors.New("please set dialer url and wallet save path")
+	if w.SavePath == "" {
+		return errors.New("please set wallet save path")
 	}
 
 	var err error
@@ -356,17 +370,23 @@ func (w *Wallet) RecoverWallet(walletString, auth string) error {
 		return err
 	}
 
-	if err = w.account.Unmarshal([]byte(wsj.EthAcct), auth); err != nil {
-		return err
+	if wsj.EthAcct != "" {
+		if err = w.account.Unmarshal([]byte(wsj.EthAcct), auth); err != nil {
+			return err
+		}
 	}
 
-	if w.client.C, err = ethclient.Dial(w.RemoteEthServer); err != nil {
-		return err
+	if w.RemoteEthServer != "" {
+		if w.client.C, err = ethclient.Dial(w.RemoteEthServer); err != nil {
+			return err
+		}
+		w.client.ServerHttpAddr = w.RemoteEthServer
 	}
-	w.client.ServerHttpAddr = w.RemoteEthServer
 
-	if err = w.btlAccount.Unmarshal([]byte(wsj.BtlAcct), auth); err != nil {
-		return err
+	if wsj.BtlAcct != "" {
+		if err = w.btlAccount.Unmarshal([]byte(wsj.BtlAcct), auth); err != nil {
+			return err
+		}
 	}
 
 	return nil
