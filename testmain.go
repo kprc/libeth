@@ -15,7 +15,7 @@ var w wallet.WalletIntf
 func main() {
 	//test2()
 
-	//test1()
+	test1()
 
 	//var a,b float64
 	//
@@ -64,16 +64,20 @@ func test2() {
 
 	bn, _ := w.BalanceOf(true)
 
-	//toAddr := common.HexToAddress("0x31495a3C681Aac2310e89Fa229863E48e2bf0DeD")
+	//fmt.Println("balance is :", bn)
 	//
+	//toAddr := common.HexToAddress("0x101c79204C2eDA00EB589371703fA3203cDE78aD")
+	////
 	//tx,err:=w.SendTo(toAddr,0.1)
 	//if err!=nil{
 	//	fmt.Println(err)
 	//}
 	//fmt.Println("tx hash",tx.Hex())
-
-	fmt.Println("addr is :", w.AccountString())
-	fmt.Println("beatle addr:", w.BtlAddress().String())
+	//
+	//fmt.Println("addr is :", w.AccountString(),"send to:",toAddr.String())
+	//fmt.Println("beatle addr:", w.BtlAddress().String())
+	//
+	//bn, _ = w.BalanceOf(true)
 	fmt.Println("balance is :", bn)
 }
 
@@ -112,8 +116,8 @@ func test1() {
 	fmt.Println("beatle addr:", w.BtlAddress().String())
 	fmt.Println("balance is :", bn)
 
-	fromAddr := common.HexToAddress("0x6148AdCeA554793f0022717F5C0AC92571b30E98")
-	hash := common.HexToHash("0x76b7ab014e25398e68221a06aa97f7887ff68658db4c74be3204d5d27f6d5f9d")
+	fromAddr := common.HexToAddress("0xfbc01bD1fD789032c0741aef9e25810538708C20")
+	hash := common.HexToHash("0x303e307bc2db70f15826ed58c34988cc70cdab33f34ee63284d405892507a15e")
 
 	checkv, err := w.CheckReceipt(fromAddr, hash)
 	if err != nil {

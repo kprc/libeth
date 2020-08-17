@@ -5,6 +5,7 @@ import (
 	"crypto/ed25519"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -30,10 +31,13 @@ type Wallet struct {
 type WalletIntf interface {
 	BalanceOf(force bool) (float64, error)
 	SendTo(to common.Address, balance float64) (*common.Hash, error)
+	SendToWithNonce(to common.Address, balance float64, nonce uint64) (*common.Hash, error)
+	Nonce() (uint64, error)
 	Address() common.Address
 	AccountString() string
 	BtlAddress() account.BeatleAddress
 	CheckReceipt(sendMeAddr common.Address, txHash common.Hash) (float64, error)
+	CheckReceiptWithNonce(sendMeAddr common.Address, txHash common.Hash, nonce uint64) (float64, error)
 	Save(auth string) error
 	Load(auth string) error
 	BtlSign(data []byte) []byte
@@ -132,6 +136,15 @@ func BalanceEth(balance float64) *big.Int {
 	return vv
 }
 
+func (w *Wallet) Nonce() (uint64, error) {
+	nonce, err := w.client.C.PendingNonceAt(context.Background(), w.account.EAddr)
+	if err != nil {
+		return 0, err
+	}
+
+	return nonce, nil
+}
+
 func (w *Wallet) SendTo(to common.Address, balance float64) (*common.Hash, error) {
 	if w.client.C == nil {
 		return nil, errors.New("no eth client")
@@ -142,8 +155,42 @@ func (w *Wallet) SendTo(to common.Address, balance float64) (*common.Hash, error
 		return nil, err
 	}
 
+	fmt.Println("sendto nonce:", nonce)
+
 	var gasPrice *big.Int
 	gasPrice, err = w.client.C.SuggestGasPrice(context.Background())
+	if err != nil {
+		return nil, err
+	}
+
+	var chainId *big.Int
+	chainId, err = w.client.C.NetworkID(context.Background())
+	if err != nil {
+		return nil, err
+	}
+
+	tx := types.NewTransaction(nonce, to, BalanceEth(balance), uint64(21000), gasPrice, nil)
+	var signdTx *types.Transaction
+	signdTx, err = types.SignTx(tx, types.NewEIP155Signer(chainId), w.account.PrivKey)
+	if err != nil {
+		return nil, err
+	}
+
+	err = w.client.C.SendTransaction(context.Background(), signdTx)
+	if err != nil {
+		return nil, err
+	}
+
+	hash := signdTx.Hash()
+	return &hash, nil
+}
+
+func (w *Wallet) SendToWithNonce(to common.Address, balance float64, nonce uint64) (*common.Hash, error) {
+	if w.client.C == nil {
+		return nil, errors.New("no eth client")
+	}
+	//var gasPrice *big.Int
+	gasPrice, err := w.client.C.SuggestGasPrice(context.Background())
 	if err != nil {
 		return nil, err
 	}
@@ -208,6 +255,42 @@ func (w *Wallet) CheckReceipt(sendMeAddr common.Address, txHash common.Hash) (fl
 		}
 		if msg.From() != sendMeAddr {
 			return 0, errors.New("not the sender")
+		}
+
+		return BalanceHuman(tx.Value()), nil
+	}
+}
+
+func (w *Wallet) CheckReceiptWithNonce(sendMeAddr common.Address, txHash common.Hash, nonce uint64) (float64, error) {
+
+	if w.client.C == nil {
+		return 0, errors.New("no eth client")
+	}
+
+	if tx, isPending, err := w.client.C.TransactionByHash(context.Background(), txHash); err != nil {
+		return 0, err
+	} else {
+		if isPending {
+			return 0, errors.New("is pending, please wait")
+		}
+
+		if tx.To().Hex() != w.account.SAddr {
+			return 0, errors.New("not send for me")
+		}
+		var chainId *big.Int
+		if chainId, err = w.client.C.NetworkID(context.Background()); err != nil {
+			return 0, err
+		}
+		var msg types.Message
+		if msg, err = tx.AsMessage(types.NewEIP155Signer(chainId)); err != nil {
+			return 0, err
+		}
+		if msg.From() != sendMeAddr {
+			return 0, errors.New("not the sender")
+		}
+
+		if tx.Nonce() != nonce {
+			return 0, errors.New("nonce error")
 		}
 
 		return BalanceHuman(tx.Value()), nil
