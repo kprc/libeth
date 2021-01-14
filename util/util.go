@@ -36,6 +36,71 @@ func Encrypt(key []byte, plainTxt []byte) ([]byte, error) {
 
 }
 
+func NewEncStream(key []byte) (stream cipher.Stream, iv [aes.BlockSize]byte,err error)  {
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return nil,iv, err
+	}
+	_, err = io.ReadFull(rand.Reader, iv[:])
+	if err != nil {
+		return nil, iv,err
+	}
+
+	stream = cipher.NewCFBEncrypter(block,iv[:])
+
+	return stream,iv,nil
+}
+
+func NewEncStreamWithIv(key []byte,iv [aes.BlockSize]byte) (stream cipher.Stream,err error)  {
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return nil, err
+	}
+
+	stream = cipher.NewCFBEncrypter(block,iv[:])
+
+	return stream,nil
+}
+
+
+
+func NewDecStream(key []byte) (stream cipher.Stream, iv [aes.BlockSize]byte,err error)  {
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return nil,iv, err
+	}
+	_, err = io.ReadFull(rand.Reader, iv[:])
+	if err != nil {
+		return nil, iv,err
+	}
+
+	stream = cipher.NewCFBDecrypter(block,iv[:])
+
+	return stream,iv,nil
+}
+
+func NewDecStreamWithIv(key []byte,iv [aes.BlockSize]byte) (stream cipher.Stream,err error)  {
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return nil, err
+	}
+
+	stream = cipher.NewCFBDecrypter(block,iv[:])
+
+	return stream,nil
+}
+
+
+func Encrypt2(stream cipher.Stream,plainTxt []byte)(cipherTxt []byte)  {
+	stream.XORKeyStream(plainTxt,plainTxt)
+	return plainTxt
+}
+
+func Decrypt2(stream cipher.Stream,cipherTxt []byte) (plainTxt []byte)  {
+	stream.XORKeyStream(cipherTxt,cipherTxt)
+	return cipherTxt
+}
+
 func Decrypt(key []byte, cipherTxt []byte) (plainTxt []byte, err error) {
 
 	if len(cipherTxt) < aes.BlockSize {

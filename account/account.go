@@ -56,6 +56,16 @@ func (acct *EthAccount) Unmarshal(data []byte, auth string) error {
 	return nil
 }
 
+func EthUnmarshal(data []byte) (*AccountJson,error)  {
+	aj := &AccountJson{}
+	if err := json.Unmarshal(data, aj); err != nil {
+		return nil,err
+	}
+
+	return aj,nil
+}
+
+
 func (acct *EthAccount) ImportFromMetaMask(hexString string) (err error) {
 	var priKey *ecdsa.PrivateKey
 	if priKey, err = crypto.HexToECDSA(hexString); err != nil {

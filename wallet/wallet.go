@@ -2,6 +2,7 @@ package wallet
 
 import (
 	"context"
+	"crypto/ecdsa"
 	"crypto/ed25519"
 	"encoding/json"
 	"errors"
@@ -30,9 +31,11 @@ type Wallet struct {
 
 type WalletIntf interface {
 	BalanceOf(force bool) (float64, error)
+	BalanceOfGas(accPoint string) (float64, error)
 	SendTo(to common.Address, balance float64) (*common.Hash, error)
-	SendToWithNonce(to common.Address, balance float64, nonce uint64) (*common.Hash, error)
+	SendToWithNonce(to common.Address, balance float64, nonce uint64,gas float64) (*common.Hash, error)
 	Nonce() (uint64, error)
+	Gas() (float64,float64,error)
 	Address() common.Address
 	AccountString() string
 	BtlAddress() account.BeatleAddress
@@ -52,6 +55,7 @@ type WalletIntf interface {
 	ExportWallet() (string, error)
 	RecoverWallet(walletString, auth string) error
 	String(auth string) (string, error)
+	PrivKey() *ecdsa.PrivateKey
 }
 
 func CreateWallet(walletSavePath string, remoteEthServer string) WalletIntf {
@@ -116,6 +120,18 @@ func (w *Wallet) BalanceOf(force bool) (float64, error) {
 	return w.balance, nil
 }
 
+func (w *Wallet)BalanceOfGas(accPoint string)(float64, error)  {
+	client,err:=ethclient.Dial(accPoint)
+	if err!=nil{
+		return 0, err
+	}
+	if balance,err:=client.BalanceAt(context.TODO(),w.account.EAddr,nil);err!=nil{
+		return 0,err
+	}else{
+		return BalanceHuman(balance),nil
+	}
+}
+
 func BalanceHuman(balance *big.Int) float64 {
 	fbalance := new(big.Float)
 	fbalance.SetString(balance.String())
@@ -144,6 +160,20 @@ func (w *Wallet) Nonce() (uint64, error) {
 
 	return nonce, nil
 }
+
+func (w *Wallet)Gas() (float64,float64,error)  {
+	gasPrice, err := w.client.C.SuggestGasPrice(context.Background())
+	if err != nil {
+		return 0, 0, err
+	}
+
+	max := &big.Int{}
+	limit:=new(big.Int).SetUint64(uint64(21000))
+	max.Mul(gasPrice,limit)
+
+	return BalanceHuman(gasPrice),BalanceHuman(max),nil
+}
+
 
 func (w *Wallet) SendTo(to common.Address, balance float64) (*common.Hash, error) {
 	if w.client.C == nil {
@@ -185,14 +215,23 @@ func (w *Wallet) SendTo(to common.Address, balance float64) (*common.Hash, error
 	return &hash, nil
 }
 
-func (w *Wallet) SendToWithNonce(to common.Address, balance float64, nonce uint64) (*common.Hash, error) {
+func (w *Wallet) SendToWithNonce(to common.Address, balance float64, nonce uint64,gas float64) (*common.Hash, error) {
 	if w.client.C == nil {
 		return nil, errors.New("no eth client")
 	}
-	//var gasPrice *big.Int
-	gasPrice, err := w.client.C.SuggestGasPrice(context.Background())
-	if err != nil {
-		return nil, err
+
+	var (
+		gasPrice *big.Int
+		err error
+	)
+
+	if gas == 0{
+		gasPrice, err = w.client.C.SuggestGasPrice(context.Background())
+		if err != nil {
+			return nil, err
+		}
+	}else{
+		gasPrice = BalanceEth(gas)
 	}
 
 	var chainId *big.Int
@@ -344,6 +383,8 @@ func (w *Wallet) String(auth string) (string, error) {
 	}
 }
 
+
+
 func (w *Wallet) Load(auth string) error {
 
 	var (
@@ -475,10 +516,15 @@ func (w *Wallet) RecoverWallet(walletString, auth string) error {
 	return nil
 }
 
+
 func (w *Wallet) ExportWallet() (string, error) {
 	if data, err := tools.OpenAndReadAll(w.SavePath); err != nil {
 		return "", err
 	} else {
 		return string(data), nil
 	}
+}
+
+func (w *Wallet)PrivKey() *ecdsa.PrivateKey  {
+	return w.account.PrivKey
 }

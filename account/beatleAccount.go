@@ -104,3 +104,13 @@ func (ba *BTLAccount) Unmarshal(data []byte, auth string) error {
 	return nil
 
 }
+
+func BeatlesUnmarshal(data []byte) (*CryptBTLJson,error)  {
+	cj:=&CryptBTLJson{}
+	if err:=json.Unmarshal(data,cj);err!=nil{
+		return nil, err
+	}
+
+	return cj,nil
+}
+

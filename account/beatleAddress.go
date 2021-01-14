@@ -12,6 +12,7 @@ const (
 	PrefixStr      string = "tg"
 	Version        int    = 1
 	Version1Len    int    = 1
+	VersionDescLen int    = 2
 )
 
 type Address [Ed25519AddrLen]byte
@@ -44,7 +45,7 @@ func (ba BeatleAddress) Address() (addr Address, prefix string, ver int, err err
 
 	ver = int(data[1])
 
-	copy(addr[:], data[PrefixLen:])
+	copy(addr[:], data[VersionDescLen:])
 
 	return
 }
