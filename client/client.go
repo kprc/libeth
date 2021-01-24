@@ -47,7 +47,7 @@ func (cl *Client)dialHttp(endpoint string) (*rpc.Client,error)  {
 				},
 			}
 
-			conn, err := d.Dial("udp", addr)
+			conn, err := d.Dial("tcp", addr)
 			if err != nil {
 				return nil, err
 			}
