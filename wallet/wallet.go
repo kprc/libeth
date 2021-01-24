@@ -27,6 +27,9 @@ type Wallet struct {
 	SavePath        string
 	RemoteEthServer string
 	balance         float64
+	protectFd       func(fd int32) bool
+	dialTimeout     int
+	connTimeout     int
 }
 
 type WalletIntf interface {
@@ -84,6 +87,37 @@ func CreateWallet(walletSavePath string, remoteEthServer string) WalletIntf {
 	return w
 }
 
+func CreateProtectWallet(walletSavePath string, remoteEthServer string, protect func(fd int32)bool,dialTO,connTO int) WalletIntf {
+	acct, err := account.NewEthAccount()
+	if err != nil {
+		return nil
+	}
+
+	var cl *client.Client
+
+	if remoteEthServer != ""{
+		cl=client.NewClient(remoteEthServer,protect,dialTO,connTO)
+		if _,err=cl.Dial(remoteEthServer);err!=nil{
+			return nil
+		}
+	}
+	btlacct, err := account.NewAccount()
+	if err != nil {
+		return nil
+	}
+
+	w := &Wallet{account: *acct, btlAccount: *btlacct, SavePath: walletSavePath, RemoteEthServer: remoteEthServer}
+	if cl != nil{
+		w.client = *cl
+	}
+
+	w.client.ServerHttpAddr = remoteEthServer
+
+	return w
+
+}
+
+
 func NewWallet(walletSavePath string, remoteEthServer string) WalletIntf {
 	w := &Wallet{SavePath: walletSavePath, RemoteEthServer: remoteEthServer}
 	return w
@@ -121,10 +155,12 @@ func (w *Wallet) BalanceOf(force bool) (float64, error) {
 }
 
 func (w *Wallet)BalanceOfGas(accPoint string)(float64, error)  {
-	client,err:=ethclient.Dial(accPoint)
+	cl := client.NewClient(accPoint, w.protectFd,w.dialTimeout,w.connTimeout)
+	client,err:=cl.Dial(accPoint)
 	if err!=nil{
 		return 0, err
 	}
+	defer client.Close()
 	if balance,err:=client.BalanceAt(context.TODO(),w.account.EAddr,nil);err!=nil{
 		return 0,err
 	}else{
